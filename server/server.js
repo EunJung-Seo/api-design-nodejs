@@ -1,14 +1,34 @@
 var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
+var morgan = require('morgan');
 var _ = require('lodash');
 
+app.use(morgan('dev'))
 app.use(express.static('client'));
 app.use(bodyParser.urlencoded({extend: true}));
 app.use(bodyParser.json());
 
 var lions = [];
 var i = 0;
+
+// Middleware
+var updateId = function(req, res, next) {
+  i += 1;
+  req.body.id = i + '';
+  next();
+};
+
+// app.param
+app.param('id', function(req, res, next, id){
+  var lion = _.find(lions, {id: id});
+  if(lion){
+    req.lion = lion;
+    next();
+  } else {
+    res.send();
+  }
+})
 
 // GET /lions
 app.get('/lions', function(req, res){
@@ -17,31 +37,28 @@ app.get('/lions', function(req, res){
 
 // GET /lions/:id
 app.get('/lions/:id', function(req, res){
-  var lion = _.find(lions, {id: req.params.id});
-  res.json(lion || {});
+  res.json(req.lion || {});
 })
 
 // POST /lions
-app.post('/lions', function(req, res){
-  i += 1;
+app.post('/lions', updateId, function(req, res){
   var data = req.body;
-  data.id = i + '';
   lions.push(data);
-  
+
   res.json(data);
 })
 
 // PUT /lions/:id
 app.put('/lions/:id', function(req, res){
   var data = req.body;
-  // 업데이트한 데이터에 id가 있는 경우 -> 원래의 id를 사용해야 하기 때문에 업데이트 데이터 안의 id는 삭제
+
   if(data.id){
     delete date.id;
   }
 
-  var index = _.findIndex(lions, {id: req.params.id});
   // 해당 id의 data가 존재한다면, update / 그렇지 않다면 그냥 리턴 
-  if(lions[index]){
+  if(req.lion){
+    var index = parseInt(req.lion.id) - 1; 
     var updatedLion = _.assign(lions[index], data);
     res.json(updatedLion);
   } else {
@@ -51,14 +68,21 @@ app.put('/lions/:id', function(req, res){
 
 // DELETE /lions/:id
 app.delete('/lions/:id', function(req, res){
-  var index = _.findIndex(lions, {id: req.params.id});
-  if(lions[index]){
-    res.send();
-  } else {
+  if(req.lion){
+    var index = parseInt(req.lion.id) - 1;
     var deletedLion = lions[index];
     lions.splice(index, 1);
     res.json(deletedLion);
+  } else {
+    res.send();
   }
 })
+
+// Middleware
+app.use(function(err, req, res, next){
+  if(err){
+    res.status(500).send(err);
+  }
+}) 
 
 app.listen(3000);
